@@ -1,0 +1,339 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Corpo Umano 3D Interattivo</title>
+    <style>
+        body { 
+            margin: 0; 
+            overflow: hidden; 
+            font-family: Arial, sans-serif;
+        }
+        canvas { 
+            display: block; 
+        }
+        #info {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            background: rgba(0,0,0,0.7);
+            color: white;
+            padding: 15px;
+            border-radius: 5px;
+            max-width: 300px;
+            display: none;
+            z-index: 100;
+            pointer-events: none;
+        }
+        #controls {
+            position: absolute;
+            bottom: 20px;
+            left: 20px;
+            z-index: 100;
+        }
+        button {
+            background: #4CAF50;
+            color: white;
+            border: none;
+            padding: 10px 15px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+            transition: background 0.3s;
+        }
+        button:hover {
+            background: #45a049;
+        }
+        #loading {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            color: white;
+            background: rgba(0,0,0,0.7);
+            padding: 20px;
+            border-radius: 5px;
+            z-index: 101;
+        }
+    </style>
+</head>
+<body>
+    <div id="info"></div>
+    <div id="controls">
+        <button onclick="resetCamera()">Reset Vista</button>
+        <button onclick="toggleWireframe()">Mostra Wireframe</button>
+    </div>
+    <div id="loading">Caricamento modello 3D...</div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.min.js"></script>
+
+    <script>
+        // Variabili globali
+        let scene, camera, renderer, controls;
+        let model, raycaster, mouse;
+        let wireframeEnabled = false;
+        
+        // Annotazioni per le parti del corpo
+        const annotations = {
+            'heart': { 
+                position: [0, 1, 0], 
+                text: 'Cuore: Pompa 5-6 litri di sangue al minuto. È un muscolo involontario che batte circa 100.000 volte al giorno.' 
+            },
+            'brain': { 
+                position: [0, 1.8, 0], 
+                text: 'Cervello: Centro del sistema nervoso. Contiene circa 86 miliardi di neuroni e consuma il 20% dell\'ossigeno del corpo.' 
+            },
+            'lungs': { 
+                position: [0, 1.2, 0], 
+                text: 'Polmoni: Organi della respirazione. Il polmone destro ha 3 lobi, il sinistro 2 per fare spazio al cuore.' 
+            },
+            'stomach': { 
+                position: [0, 0.8, 0], 
+                text: 'Stomaco: Parte del sistema digerente. Produce acidi e enzimi che scompongono il cibo.' 
+            },
+            'liver': { 
+                position: [0, 0.9, 0], 
+                text: 'Fegato: Il più grande organo interno. Svolge oltre 500 funzioni tra cui disintossicazione e produzione di proteine.' 
+            }
+        };
+
+        // Inizializza la scena
+        init();
+        
+        // Funzione di inizializzazione
+        function init() {
+            // Setup scena
+            scene = new THREE.Scene();
+            scene.background = new THREE.Color(0xf0f0f0);
+            
+            // Camera
+            camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+            camera.position.set(0, 1.5, 3);
+            
+            // Renderer
+            renderer = new THREE.WebGLRenderer({ antialias: true });
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            renderer.setPixelRatio(window.devicePixelRatio);
+            renderer.shadowMap.enabled = true;
+            document.body.appendChild(renderer.domElement);
+            
+            // Controlli camera
+            controls = new THREE.OrbitControls(camera, renderer.domElement);
+            controls.enableDamping = true;
+            controls.dampingFactor = 0.05;
+            controls.screenSpacePanning = false;
+            controls.minDistance = 1;
+            controls.maxDistance = 10;
+            controls.maxPolarAngle = Math.PI;
+            
+            // Luci
+            const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
+            scene.add(ambientLight);
+            
+            const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
+            directionalLight.position.set(1, 1.5, 1);
+            directionalLight.castShadow = true;
+            directionalLight.shadow.mapSize.width = 1024;
+            directionalLight.shadow.mapSize.height = 1024;
+            scene.add(directionalLight);
+            
+            const hemisphereLight = new THREE.HemisphereLight(0xffffbb, 0x080820, 0.5);
+            scene.add(hemisphereLight);
+            
+            // Raycaster per l'interazione
+            raycaster = new THREE.Raycaster();
+            mouse = new THREE.Vector2();
+            
+            // Carica modello 3D (usando un modello di esempio poiché 'human_body.glb' non esiste)
+            // Nella realtà dovresti sostituire questo URL con il percorso al tuo modello
+            loadDefaultModel();
+            
+            // Gestione eventi
+            window.addEventListener('resize', onWindowResize);
+            window.addEventListener('click', onClick);
+            
+            // Nascondi il loader dopo un timeout (nella realtà dovresti nasconderlo dopo il caricamento)
+            setTimeout(() => {
+                document.getElementById('loading').style.display = 'none';
+            }, 2000);
+            
+            // Avvia l'animazione
+            animate();
+        }
+        
+        // Carica un modello di default (un cubo con sfere per gli organi)
+        function loadDefaultModel() {
+            // Creiamo un modello semplice per dimostrazione
+            const body = new THREE.Group();
+            
+            // Torso (cubo)
+            const torsoGeometry = new THREE.BoxGeometry(1, 2, 0.5);
+            const torsoMaterial = new THREE.MeshPhongMaterial({ 
+                color: 0xffccaa,
+                transparent: true,
+                opacity: 0.7
+            });
+            const torso = new THREE.Mesh(torsoGeometry, torsoMaterial);
+            torso.position.y = 1;
+            torso.name = "torso";
+            body.add(torso);
+            
+            // Testa (sfera)
+            const headGeometry = new THREE.SphereGeometry(0.3, 32, 32);
+            const headMaterial = new THREE.MeshPhongMaterial({ color: 0xffccaa });
+            const head = new THREE.Mesh(headGeometry, headMaterial);
+            head.position.y = 2.3;
+            head.name = "head";
+            body.add(head);
+            
+            // Organi (per dimostrazione)
+            createOrgan(body, 'heart', 0xff0000, [0, 1.2, 0.3], 0.15);
+            createOrgan(body, 'brain', 0xffff00, [0, 2.3, 0], 0.25);
+            createOrgan(body, 'lungs', 0x00ff00, [0, 1.5, 0.2], 0.2, true);
+            createOrgan(body, 'stomach', 0x0000ff, [0, 0.8, 0.3], 0.15);
+            createOrgan(body, 'liver', 0x00ffff, [0.2, 0.9, 0.3], 0.15);
+            
+            model = body;
+            scene.add(model);
+        }
+        
+        // Crea un organo semplice
+        function createOrgan(parent, name, color, position, size, isPair = false) {
+            const geometry = new THREE.SphereGeometry(size, 32, 32);
+            const material = new THREE.MeshPhongMaterial({ 
+                color: color,
+                transparent: true,
+                opacity: 0.9,
+                shininess: 30
+            });
+            
+            const organ = new THREE.Mesh(geometry, material);
+            organ.position.set(position[0], position[1], position[2]);
+            organ.name = name;
+            parent.add(organ);
+            
+            if(isPair) {
+                // Crea una copia per organi pari (come i polmoni)
+                const organ2 = organ.clone();
+                organ2.position.x = -position[0];
+                parent.add(organ2);
+            }
+        }
+        
+        // Gestione click
+        function onClick(event) {
+            // Calcola la posizione del mouse in coordinate normalizzate (-1 to +1)
+            mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
+            mouse.y = - (event.clientY / window.innerHeight) * 2 + 1;
+            
+            // Aggiorna il raycaster
+            raycaster.setFromCamera(mouse, camera);
+            
+            // Calcola gli oggetti intersecati
+            const intersects = raycaster.intersectObjects(scene.children, true);
+            
+            if (intersects.length > 0) {
+                // Trova il primo oggetto intersecato che non è il torso
+                let object = intersects[0].object;
+                while (object.parent !== null && object.name === "") {
+                    object = object.parent;
+                }
+                
+                if (object.name && object.name !== "torso" && object.name !== "head") {
+                    zoomToPart(object);
+                    showInfo(object.name);
+                }
+            }
+        }
+        
+        // Zoom sull'organo selezionato
+        function zoomToPart(object) {
+            const boundingBox = new THREE.Box3().expandByObject(object);
+            const center = boundingBox.getCenter(new THREE.Vector3());
+            const size = boundingBox.getSize(new THREE.Vector3());
+            
+            // Calcola la distanza della camera per inquadrare l'oggetto
+            const maxDim = Math.max(size.x, size.y, size.z);
+            const fov = camera.fov * (Math.PI / 180);
+            let distance = Math.abs(maxDim / Math.sin(fov / 2)) * 1.5;
+            
+            // Limita la distanza minima e massima
+            distance = Math.max(0.5, Math.min(5, distance));
+            
+            // Calcola la posizione finale della camera
+            const direction = new THREE.Vector3().subVectors(camera.position, controls.target).normalize();
+            const finalPosition = new THREE.Vector3().copy(center).add(direction.multiplyScalar(-distance));
+            
+            // Animazione della camera
+            animateCamera(camera.position, finalPosition, center);
+        }
+        
+        // Animazione fluida della camera
+        function animateCamera(fromPos, toPos, target) {
+            const duration = 1000; // 1 secondo
+            const startTime = Date.now();
+            
+            function update() {
+                const elapsed = Date.now() - startTime;
+                const progress = Math.min(elapsed / duration, 1);
+                
+                // Interpolazione lineare
+                camera.position.lerpVectors(fromPos, toPos, progress);
+                controls.target.lerpVectors(controls.target, target, progress);
+                controls.update();
+                
+                if (progress < 1) {
+                    requestAnimationFrame(update);
+                }
+            }
+            
+            update();
+        }
+        
+        // Mostra informazioni sull'organo
+        function showInfo(partName) {
+            const infoDiv = document.getElementById('info');
+            if (annotations[partName]) {
+                infoDiv.style.display = 'block';
+                infoDiv.innerHTML = `<h3>${partName.charAt(0).toUpperCase() + partName.slice(1)}</h3>
+                                     <p>${annotations[partName].text}</p>`;
+            } else {
+                infoDiv.style.display = 'none';
+            }
+        }
+        
+        // Resetta la vista
+        function resetCamera() {
+            animateCamera(camera.position, new THREE.Vector3(0, 1.5, 3), new THREE.Vector3(0, 0, 0));
+            document.getElementById('info').style.display = 'none';
+        }
+        
+        // Attiva/disattiva wireframe
+        function toggleWireframe() {
+            wireframeEnabled = !wireframeEnabled;
+            scene.traverse(function(child) {
+                if (child.isMesh) {
+                    child.material.wireframe = wireframeEnabled;
+                }
+            });
+        }
+        
+        // Gestione resize della finestra
+        function onWindowResize() {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        }
+        
+        // Loop di animazione
+        function animate() {
+            requestAnimationFrame(animate);
+            controls.update();
+            renderer.render(scene, camera);
+        }
+    </script>
+</body>
+</html>
