@@ -1,51 +1,15 @@
-body { 
-    margin: 0; 
-    overflow: hidden; 
-    font-family: Arial, sans-serif;
-}
-
-canvas { 
-    display: block; 
-}
-
+body { margin: 0; overflow: hidden; font-family: Arial; }
+canvas { display: block; }
 #info {
-    position: absolute;
-    top: 20px;
-    left: 20px;
-    background: rgba(0,0,0,0.7);
-    color: white;
-    padding: 15px;
-    border-radius: 5px;
-    max-width: 300px;
-    display: none;
-    z-index: 100;
+    position: absolute; top: 20px; left: 20px;
+    background: rgba(0,0,0,0.7); color: white;
+    padding: 15px; border-radius: 5px; max-width: 300px;
+    display: none; z-index: 100;
 }
-
-#controls {
-    position: absolute;
-    bottom: 20px;
-    left: 20px;
-    z-index: 100;
-}
-
-button {
-    background: #4CAF50;
-    color: white;
-    border: none;
-    padding: 10px 15px;
-    border-radius: 4px;
-    cursor: pointer;
-    margin-right: 10px;
-}
-
+#controls { position: absolute; bottom: 20px; left: 20px; z-index: 100; }
+button { background: #4CAF50; color: white; border: none; padding: 10px 15px; margin-right: 10px; border-radius: 4px; cursor: pointer; }
 #loading {
-    position: absolute;
-    top: 50%;
-    left: 50%;
-    transform: translate(-50%, -50%);
-    color: white;
-    background: rgba(0,0,0,0.7);
-    padding: 20px;
-    border-radius: 5px;
+    position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+    color: white; background: rgba(0,0,0,0.7); padding: 20px; border-radius: 5px;
     z-index: 101;
 }
